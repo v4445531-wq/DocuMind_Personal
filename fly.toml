@@ -1,0 +1,24 @@
+app = 'documind-personal-unfurling-shell-2137'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'Dockerfile.fly'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+
+[env]
+  LLM_PROVIDER = "openai"
+  HYBRID_ENABLED = "true"
+  RERANKER = "none"
+  DOCUMENT_SERVICE_URL = "http://localhost:8001"
+  QUERY_SERVICE_URL = "http://localhost:8002"
+  CORS_ORIGINS = "https://documind-personal-unfurling-shell-2137.fly.dev"
+
+[[vm]]
+  memory = '1gb'
+  cpus = 1
