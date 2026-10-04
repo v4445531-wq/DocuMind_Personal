@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # ---- Postgres (the `documents` metadata table, async/asyncpg) ----
+    database_url: str = ""
     postgres_host: str = "localhost"
     postgres_port: int = 5432
     postgres_db: str = "documind"
@@ -33,7 +34,8 @@ class Settings(BaseSettings):
 
     @property
     def sqlalchemy_async_url(self) -> str:
-        """Async engine (asyncpg) for the `documents` metadata table."""
+        if self.database_url:
+            return self.database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
         return (
             f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"

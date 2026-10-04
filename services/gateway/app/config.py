@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
 
     # ---- Postgres (the `users` table, async/asyncpg) ----
+    # Set DATABASE_URL to use Neon or any external Postgres (overrides individual fields).
+    database_url: str = ""
     postgres_host: str = "localhost"
     postgres_port: int = 5432
     postgres_db: str = "documind"
@@ -47,6 +49,9 @@ class Settings(BaseSettings):
 
     @property
     def sqlalchemy_async_url(self) -> str:
+        if self.database_url:
+            # Neon/external: swap driver for asyncpg
+            return self.database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
         return (
             f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"

@@ -98,9 +98,11 @@ services:
       DOCUMENT_SERVICE_URL: http://document-service:8001
       QUERY_SERVICE_URL: http://query-service:8002
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
-      # Neon: pass DATABASE_URL through so gateway can reach the DB if needed
       DATABASE_URL: ${DATABASE_URL:-}
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-documind}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-documind}
+      POSTGRES_DB: ${POSTGRES_DB:-documind}
     depends_on:
       redis:
         condition: service_healthy
