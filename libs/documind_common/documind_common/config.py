@@ -122,8 +122,8 @@ class CommonSettings(BaseSettings):
     def pgvector_url(self) -> str:
         """SQLAlchemy connection string for pgvector. Uses Neon DATABASE_URL when set."""
         if self.database_url:
-            # Neon gives a standard postgresql:// URL; swap driver for psycopg3.
-            return self.database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+            url = self.database_url.split("?")[0]
+            return url.replace("postgresql://", "postgresql+psycopg://", 1) + "?sslmode=require"
         return (
             f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
@@ -133,7 +133,8 @@ class CommonSettings(BaseSettings):
     def psycopg_conninfo(self) -> str:
         """Plain libpq DSN for raw psycopg queries (the keyword-search arm)."""
         if self.database_url:
-            return self.database_url
+            url = self.database_url.split("?")[0]
+            return url + "?sslmode=require"
         return (
             f"postgresql://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
