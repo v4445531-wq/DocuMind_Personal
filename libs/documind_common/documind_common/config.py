@@ -1,0 +1,148 @@
+"""Shared RAG configuration, loaded once from environment / .env.
+
+Switching providers is a ONE-LINE change: set `LLM_PROVIDER` to `openai`,
+`anthropic`, or `ollama`, and the right chat model, embedding model, embedding
+dimensions, and vector collection are filled in from a per-provider profile.
+Each provider gets its OWN collection (e.g. documind_openai vs documind_ollama),
+so you can flip back and forth without the 1536-d/768-d dimension clash and
+without re-indexing. Any field can still be overridden explicitly via env.
+
+The model is a frozen `pydantic-settings` object built once at import; the
+per-provider defaults are derived in a `model_validator` (see below).
+"""
+from __future__ import annotations
+
+from functools import lru_cache
+
+from pydantic import model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+# Per-provider defaults. openai/anthropic share OpenAI embeddings (Anthropic has
+# none), so they share the 1536-d collection; ollama is fully local at 768-d.
+_PROFILES: dict[str, dict] = {
+    "openai": {
+        "chat_model": "gpt-4o-mini",
+        "embedding_model": "text-embedding-3-small",
+        "embedding_dimensions": 1536,
+        "vector_collection": "documind_openai",
+    },
+    "anthropic": {
+        "chat_model": "claude-sonnet-4-6",
+        "embedding_model": "text-embedding-3-small",
+        "embedding_dimensions": 1536,
+        "vector_collection": "documind_openai",
+    },
+    "ollama": {
+        "chat_model": "llama3.2:3b",
+        "embedding_model": "nomic-embed-text",
+        "embedding_dimensions": 768,
+        "vector_collection": "documind_ollama",
+    },
+}
+
+
+class CommonSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    # ---- Provider switch (the one knob you usually touch) ----
+    llm_provider: str = "openai"          # "openai" | "anthropic" | "ollama"
+
+    # ---- Credentials / endpoints ----
+    openai_api_key: str = "sk-missing"
+    openai_base_url: str | None = None
+    anthropic_api_key: str = ""
+    ollama_base_url: str = "http://localhost:11434"
+    temperature: float = 0.2
+
+    # ---- Model selection (left as None -> derived from the provider profile) ----
+    chat_model: str | None = None
+    embedding_model: str | None = None
+    embedding_dimensions: int | None = None
+    vector_collection: str | None = None
+
+    # ---- Postgres / pgvector — local container OR Neon serverless ----
+    # Set DATABASE_URL to a Neon connection string to skip local Postgres entirely.
+    # Example: postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require
+    # Leave blank to use the individual postgres_* fields (local container).
+    database_url: str = ""
+    postgres_host: str = "localhost"
+    postgres_port: int = 5432
+    postgres_db: str = "documind"
+    postgres_user: str = "documind"
+    postgres_password: str = "documind"
+
+    # ---- RAG / chunking + hybrid retrieval ----
+    chunk_size_tokens: int = 800
+    overlap_tokens: int = 100
+    chars_per_token: int = 4
+    top_k: int = 4
+    hybrid_enabled: bool = True
+    retrieval_candidates: int = 20
+    reranker: str = "none"               # "none" | "cross-encoder" | "llm"
+    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    rerank_pool: int = 12                # fused candidates handed to the reranker
+    rerank_snippet_chars: int = 500      # chars per candidate shown to an LLM reranker
+
+    # Relevance bar for the DENSE arm (cosine distance; lower = closer). 0 disables.
+    #
+    # Retrieval is not a relevance test: `ORDER BY ... LIMIT k` returns k rows from
+    # any non-empty collection, RRF then replaces the distances with rank-only
+    # scores, and a reranker can only reorder — it has no "none of these are any
+    # good". Without this bar the "no context" guard in the ask flow can only fire
+    # on an empty corpus, and every refusal is really the model choosing to obey
+    # the prompt. 0.55 is a STARTING POINT for text-embedding-3-small, not a
+    # measured value — calibrate against a real corpus (see EVALS_GUIDE.md).
+    max_distance: float = 0.55
+
+    # ---- Conversation memory + query rewriting ----
+    history_turns: int = 4               # recent turns replayed into the prompt
+    rewrite_enabled: bool = True         # condense follow-ups into standalone queries
+
+    # ---- Contextual retrieval (ingestion side) ----
+    contextual_retrieval_enabled: bool = False
+    contextual_context_chars: int = 2000  # document prefix shown to the context writer
+
+    @model_validator(mode="after")
+    def _apply_provider_profile(self) -> "CommonSettings":
+        # Treat unset OR empty ("") as "use the provider profile" — empty strings
+        # are common when a compose var is passed through without a value.
+        profile = _PROFILES.get(self.llm_provider.lower(), _PROFILES["openai"])
+        if not self.chat_model:
+            self.chat_model = profile["chat_model"]
+        if not self.embedding_model:
+            self.embedding_model = profile["embedding_model"]
+        if not self.embedding_dimensions:
+            self.embedding_dimensions = profile["embedding_dimensions"]
+        if not self.vector_collection:
+            self.vector_collection = profile["vector_collection"]
+        return self
+
+    @property
+    def pgvector_url(self) -> str:
+        """SQLAlchemy connection string for pgvector. Uses Neon DATABASE_URL when set."""
+        if self.database_url:
+            # Neon gives a standard postgresql:// URL; swap driver for psycopg3.
+            return self.database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+        return (
+            f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        )
+
+    @property
+    def psycopg_conninfo(self) -> str:
+        """Plain libpq DSN for raw psycopg queries (the keyword-search arm)."""
+        if self.database_url:
+            return self.database_url
+        return (
+            f"postgresql://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        )
+
+
+@lru_cache
+def get_settings() -> CommonSettings:
+    return CommonSettings()
+
+
+settings = get_settings()
