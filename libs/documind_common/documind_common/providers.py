@@ -37,6 +37,10 @@ def get_embeddings() -> Embeddings:
         dimensions=settings.embedding_dimensions,
         api_key=settings.openai_api_key,
         base_url=settings.openai_base_url,
+        # Neon AI Gateway only accepts plain text strings, not token IDs.
+        # Disabling tiktoken encoding makes LangChain send raw text instead.
+        check_embedding_ctx_length=False,
+        tiktoken_enabled=False,
     )
 
 
