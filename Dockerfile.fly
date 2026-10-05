@@ -1,6 +1,15 @@
-FROM python:3.12-slim
+FROM node:20-alpine AS frontend-build
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+ENV VITE_API_BASE_URL=https://documind-personal-unfurling-shell-2137.fly.dev
+RUN npm run build
 
+FROM python:3.12-slim
 WORKDIR /app
+
+RUN apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*
 
 COPY libs/ /libs/
 RUN pip install --no-cache-dir /libs/documind_contracts /libs/documind_common
@@ -9,6 +18,12 @@ COPY services/gateway/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY services/gateway/app ./app
+COPY --from=frontend-build /frontend/dist /usr/share/nginx/html
+
+COPY fly-nginx.conf /etc/nginx/sites-available/default
+
+COPY fly-start.sh /start.sh
+RUN chmod +x /start.sh
 
 EXPOSE 8080
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["/start.sh"]
