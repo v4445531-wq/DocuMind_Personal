@@ -82,9 +82,15 @@ async def upload(
     )
 
     if settings.sync_ingest:
-        # No Kafka — ingest directly in the request (for hosted deployments)
+        # No Kafka — ingest in a background task with a fresh session
         from app.ingestion import ingest
-        asyncio.create_task(ingest(session, event))
+        from app.db import SessionLocal
+
+        async def _ingest_bg():
+            async with SessionLocal() as bg_session:
+                await ingest(bg_session, event)
+
+        asyncio.create_task(_ingest_bg())
         log.info("document uploaded (sync ingest)", stage="upload", document_id=str(document_id))
     else:
         await producer.publish(
