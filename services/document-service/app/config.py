@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     document_events_dlt_topic: str = "document-events.DLT"
     consumer_group: str = "documind-ingestion"
 
+    # ---- Sync ingest mode (no Kafka) ----
+    # When True, upload directly triggers ingestion inline instead of via Kafka.
+    # Use for hosted deployments without Kafka (Fly.io, etc).
+    sync_ingest: bool = False
+
     # ---- Uploads ----
     storage_dir: str = "./storage"
     max_upload_bytes: int = 20 * 1024 * 1024

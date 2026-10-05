@@ -18,6 +18,7 @@ from documind_contracts import ErrorResponse
 
 from app import producer
 from app.consumer import IngestionConsumer
+from app.config import settings
 from app.db import engine, init_db
 from app.errors import DocumentNotFoundError, InvalidFileError
 from app.routes import router
@@ -32,12 +33,14 @@ _consumer = IngestionConsumer()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await init_db()
-    await producer.start_producer()
-    await _consumer.start()
+    if not settings.sync_ingest:
+        await producer.start_producer()
+        await _consumer.start()
     log.info("startup complete", stage="startup")
     yield
-    await _consumer.stop()
-    await producer.stop_producer()
+    if not settings.sync_ingest:
+        await _consumer.stop()
+        await producer.stop_producer()
     log.info("shutdown complete", stage="shutdown")
 
 

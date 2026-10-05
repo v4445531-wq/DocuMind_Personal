@@ -80,10 +80,17 @@ async def upload(
         storage_path=str(target.resolve()),
         uploaded_at=uploaded_at,
     )
-    await producer.publish(
-        settings.document_events_topic, key=str(document_id), value=event.model_dump(mode="json")
-    )
-    log.info("document uploaded", stage="upload", document_id=str(document_id), filename=safe_name)
+
+    if settings.sync_ingest:
+        # No Kafka — ingest directly in the request (for hosted deployments)
+        from app.ingestion import ingest
+        asyncio.create_task(ingest(session, event))
+        log.info("document uploaded (sync ingest)", stage="upload", document_id=str(document_id))
+    else:
+        await producer.publish(
+            settings.document_events_topic, key=str(document_id), value=event.model_dump(mode="json")
+        )
+        log.info("document uploaded", stage="upload", document_id=str(document_id), filename=safe_name)
 
     return UploadResponse(
         document_id=document_id,

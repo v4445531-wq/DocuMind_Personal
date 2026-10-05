@@ -1,0 +1,20 @@
+app = 'documind-document-service'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'services/document-service/Dockerfile'
+
+[http_service]
+  internal_port = 8001
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+
+[env]
+  KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+  STORAGE_DIR = "/data/storage"
+
+[[vm]]
+  memory = '1gb'
+  cpus = 1
