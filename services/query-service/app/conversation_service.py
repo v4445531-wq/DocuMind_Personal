@@ -1,4 +1,8 @@
-"""Conversation history persistence and retrieval (MongoDB)."""
+"""Conversation history persistence and retrieval (MongoDB).
+
+MongoDB is optional — if unavailable, history is silently skipped.
+The app still works fully, just without multi-turn memory.
+"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -26,16 +30,19 @@ async def save_turn(
     retrieved_chunk_ids: list[str],
     timestamp: datetime,
 ) -> None:
-    await conversations().insert_one(
-        {
-            "conversation_id": conversation_id,
-            "question": question,
-            "answer": answer,
-            "citations": [c.model_dump() for c in citations],
-            "retrieved_chunk_ids": retrieved_chunk_ids,
-            "timestamp": timestamp,
-        }
-    )
+    try:
+        await conversations().insert_one(
+            {
+                "conversation_id": conversation_id,
+                "question": question,
+                "answer": answer,
+                "citations": [c.model_dump() for c in citations],
+                "retrieved_chunk_ids": retrieved_chunk_ids,
+                "timestamp": timestamp,
+            }
+        )
+    except Exception as exc:
+        log.warning("history save failed (skipping)", error=str(exc))
 
 
 async def recent_turns(conversation_id: str, limit: int) -> list[tuple[str, str]]:

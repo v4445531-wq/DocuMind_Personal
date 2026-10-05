@@ -28,10 +28,16 @@ log = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    await init_indexes()
+    try:
+        await init_indexes()
+    except Exception as exc:
+        log.warning("MongoDB unavailable — conversation history disabled", error=str(exc))
     log.info("startup complete", stage="startup")
     yield
-    await close_client()
+    try:
+        await close_client()
+    except Exception:
+        pass
     log.info("shutdown complete", stage="shutdown")
 
 
