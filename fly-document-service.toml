@@ -12,8 +12,12 @@ primary_region = 'iad'
   min_machines_running = 0
 
 [env]
-  KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+  SYNC_INGEST = "true"
   STORAGE_DIR = "/data/storage"
+
+[[mounts]]
+  source = "docstore"
+  destination = "/data/storage"
 
 [[vm]]
   memory = '1gb'
