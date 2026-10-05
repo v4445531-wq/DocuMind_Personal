@@ -2,11 +2,9 @@ import axios from "axios";
 
 import { clearToken, getToken } from "../auth/token";
 
-// Base URL is the GATEWAY now — the frontend never talks to the services
-// directly. Defaults to the local gateway; baked from VITE_API_BASE_URL at build.
-// Exported separately because the streaming endpoint uses fetch (axios doesn't
-// expose a readable stream in the browser) and needs the URL + token itself.
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
+// Use relative URLs so the frontend works on any host (localhost, Fly.io, etc.)
+// The reverse proxy (nginx on Fly.io, Vite dev proxy locally) routes /api/ and /auth/ to the gateway.
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
