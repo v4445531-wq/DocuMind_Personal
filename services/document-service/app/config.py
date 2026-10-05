@@ -35,7 +35,8 @@ class Settings(BaseSettings):
     @property
     def sqlalchemy_async_url(self) -> str:
         if self.database_url:
-            return self.database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            url = self.database_url.split("?")[0]
+            return url.replace("postgresql://", "postgresql+asyncpg://", 1) + "?ssl=require"
         return (
             f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
